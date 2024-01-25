@@ -21,8 +21,6 @@ jobs:
       with:
         java-version: '16'
         distribution: 'temurin'
-    - name: Make maven executable
-      run: chmod +x ./mvn
     - name: Build with Maven
       run: ./mvn install
     - name: Upload Artifacts
