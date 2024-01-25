@@ -1,7 +1,7 @@
 name: ArmorPlus
 version: ${project.version}
 main: gg.steve.mc.ap.ArmorPlus
-api-version: 1.20
+api-version: 1.16
 prefix: Armor+
 authors: [nbdSteve, laspi64]
 description: Comprehensive and free custom armor plugin, developed by Steve.

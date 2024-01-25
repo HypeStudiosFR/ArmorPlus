@@ -10,18 +10,19 @@ import gg.steve.mc.ap.player.SetPlayerManager;
 import gg.steve.mc.ap.utils.CommandUtil;
 import org.bukkit.Material;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.inventory.ItemStack;
 
 public class PlayerEquipListener implements Listener {
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void equip(ArmorEquipEvent event) {
-        if (event.isCancelled()) return;
         if (event.getNewArmorPiece() == null || event.getNewArmorPiece().getType().equals(Material.AIR)) {
             return;
         }
+
         NBTItem nbtItem = new NBTItem(event.getNewArmorPiece());
         if (nbtItem.getString("armor+.set").equalsIgnoreCase("")) return;
         if (ConfigManager.CONFIG.get().getStringList("head-items").contains(nbtItem.getItem().getType().toString().toLowerCase())) {

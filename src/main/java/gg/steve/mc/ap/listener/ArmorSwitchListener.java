@@ -19,17 +19,19 @@ import org.bukkit.inventory.ItemStack;
 
 public class ArmorSwitchListener implements Listener {
 
+
+
     @EventHandler
     public void switchPiece(PlayerInteractEvent event) {
         if (!(event.getAction().equals(Action.RIGHT_CLICK_BLOCK) || event.getAction().equals(Action.RIGHT_CLICK_AIR)))
             return;
         if (!ConfigManager.CONFIG.get().getBoolean("armor-switch.enabled")) return;
         if (event.getItem() == null || event.getItem().getType().equals(Material.AIR)) return;
-        if (ArmorType.matchType(event.getItem()) == null) return;
+        if (ArmorType.matchTypeByItem(event.getItem()) == null) return;
         if (!new NBTItem(event.getItem()).getString("armor+.set").equalsIgnoreCase("") && ArmorListener.isHeadItem(event.getItem())) {
             event.setCancelled(true);
         }
-        ArmorType type = ArmorType.matchType(event.getItem());
+        ArmorType type = ArmorType.matchTypeByItem(event.getItem());
         Player player = event.getPlayer();
         ArmorEquipEvent change;
         if (event.getPlayer().getInventory().getHelmet() != null

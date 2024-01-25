@@ -10,14 +10,15 @@ import gg.steve.mc.ap.player.SetPlayerManager;
 import gg.steve.mc.ap.utils.CommandUtil;
 import org.bukkit.Material;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 
 public class PlayerUnequipListener implements Listener {
 
-    @EventHandler
+
+    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
     public void unEquip(ArmorEquipEvent event) {
-        if (event.isCancelled()) return;
         if (event.getOldArmorPiece() == null || event.getOldArmorPiece().getType().equals(Material.AIR))
             return;
         NBTItem nbtItem = new NBTItem(event.getOldArmorPiece());
