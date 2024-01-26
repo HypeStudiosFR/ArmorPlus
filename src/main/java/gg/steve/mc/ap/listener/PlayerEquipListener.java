@@ -19,12 +19,14 @@ public class PlayerEquipListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void equip(ArmorEquipEvent event) {
+        System.out.println("SECOND CALL");
         if (event.getNewArmorPiece() == null || event.getNewArmorPiece().getType().equals(Material.AIR)) {
             return;
         }
 
         NBTItem nbtItem = new NBTItem(event.getNewArmorPiece());
         if (nbtItem.getString("armor+.set").equalsIgnoreCase("")) return;
+        if (ArmorEquipEvent.hasCoolDown(event)) return;
         if (ConfigManager.CONFIG.get().getStringList("head-items").contains(nbtItem.getItem().getType().toString().toLowerCase())) {
             event.getPlayer().getInventory().setHelmet(event.getNewArmorPiece());
             if (event.getMethod().equals(ArmorEquipEvent.EquipMethod.PICK_DROP) || event.getMethod().equals(ArmorEquipEvent.EquipMethod.SHIFT_CLICK)) {

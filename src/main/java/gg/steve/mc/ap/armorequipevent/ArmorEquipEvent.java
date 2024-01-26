@@ -1,16 +1,40 @@
 package gg.steve.mc.ap.armorequipevent;
 
+import gg.steve.mc.ap.ArmorPlus;
+import gg.steve.mc.ap.nbt.NBTItem;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.player.PlayerEvent;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
 /**
  * @author Arnah
  * @since Jul 30, 2015
  */
 public final class ArmorEquipEvent extends PlayerEvent implements Cancellable {
+
+    public static final Map<UUID, Long> EVENT_COOLDOWN_MAP = new HashMap<>();
+
+    public static boolean hasCoolDown(ArmorEquipEvent event) {
+        final UUID uuid = event.player.getUniqueId();
+        final long currentTimeStamp = System.currentTimeMillis();
+        final Long lastTimeStamp = EVENT_COOLDOWN_MAP.remove(uuid);
+        if (lastTimeStamp != null && currentTimeStamp - lastTimeStamp <= 500) {
+            EVENT_COOLDOWN_MAP.put(uuid, currentTimeStamp);
+            event.setCancelled(true);
+            return true;
+        }
+
+        Bukkit.getScheduler().scheduleSyncDelayedTask(ArmorPlus.get(), () -> EVENT_COOLDOWN_MAP.put(uuid, currentTimeStamp));
+        return false;
+    }
+
     private static final HandlerList handlers = new HandlerList();
     private boolean cancel = false;
     private final EquipMethod equipType;
