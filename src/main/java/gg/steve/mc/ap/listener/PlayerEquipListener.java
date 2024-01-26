@@ -19,7 +19,6 @@ public class PlayerEquipListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void equip(ArmorEquipEvent event) {
-        System.out.println("SECOND CALL");
         if (event.getNewArmorPiece() == null || event.getNewArmorPiece().getType().equals(Material.AIR)) {
             return;
         }

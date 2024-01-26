@@ -19,7 +19,6 @@ public class PlayerUnequipListener implements Listener {
 
     @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
     public void unEquip(ArmorEquipEvent event) {
-        System.out.println("FIRST CALL");
         if (event.getOldArmorPiece() == null || event.getOldArmorPiece().getType().equals(Material.AIR))
             return;
         NBTItem nbtItem = new NBTItem(event.getOldArmorPiece());
