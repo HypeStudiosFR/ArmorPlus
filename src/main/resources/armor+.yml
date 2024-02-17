@@ -33,6 +33,11 @@ armor-switch:
     text:
       - '&7&l** &oARMOR PIECE SWITCHED &7&l**'
 #
+click-cooldown:
+  enabled: true
+  time-in-millis: 2000
+  message: "&cVeuillez attendre %time% secondes avant de changer d'armure à nouveau."
+
 gui:
   name: '&5&lArmor&d&l+'
   type: 'none'

@@ -63,6 +63,9 @@ public class ArmorListener implements Listener {
         }
         final ArmorType newArmorType = ArmorType.matchTypeBySlot(fillEmptyShift ? shiftSlot : slot);
         if (newArmorType == null) return;
+        final ItemStack oldCursor = e.getCursor();
+        final ItemStack oldCurrent = e.getCurrentItem();
+        final ArmorType oldArmorType = ArmorType.matchTypeByItem(oldCursor);
         final ItemStack clickedItem = shift && !fillEmptyShift && e.getCurrentItem() != null ? e.getCurrentItem().clone() : null;
         final int firstEmptySlot;
         if (shift && !fillEmptyShift) {
@@ -99,6 +102,11 @@ public class ArmorListener implements Listener {
             ArmorEquipEvent armorEquipEvent = new ArmorEquipEvent(player, method, newArmorType, oldArmorPiece, newArmorPiece);
             Bukkit.getServer().getPluginManager().callEvent(armorEquipEvent);
             if (armorEquipEvent.isCancelled()) {
+                if (oldArmorType != null && oldArmorType != newArmorType && !fillEmptyShift) {
+                    player.setItemOnCursor(oldCursor);
+                    clickedInventory.setItem(slot, oldCurrent);
+                    return;
+                }
                 if (fillEmptyShift) {
                     clickedInventory.setItem(slot, newArmorPiece);
                     clickedInventory.setItem(shiftSlot, null);

@@ -1,14 +1,17 @@
 package gg.steve.mc.ap.armorequipevent;
 
 import gg.steve.mc.ap.ArmorPlus;
-import gg.steve.mc.ap.nbt.NBTItem;
+import gg.steve.mc.ap.managers.ConfigManager;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.player.PlayerEvent;
 import org.bukkit.inventory.ItemStack;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -22,14 +25,22 @@ public final class ArmorEquipEvent extends PlayerEvent implements Cancellable {
     public static final Map<UUID, Long> EVENT_COOLDOWN_MAP = new HashMap<>();
 
     public static boolean hasCoolDown(ArmorEquipEvent event) {
+        if (!ConfigManager.CONFIG.get().getBoolean("click-cooldown.enabled")) {
+            return false;
+        }
+        final long coolDownTime = ConfigManager.CONFIG.get().getLong("click-cooldown.time-in-millis");
+        final String coolDownMessage = ConfigManager.CONFIG.get().getString("click-cooldown.message");
         final UUID uuid = event.player.getUniqueId();
         final long currentTimeStamp = System.currentTimeMillis();
         final Long lastTimeStamp = EVENT_COOLDOWN_MAP.remove(uuid);
-        if (lastTimeStamp != null && currentTimeStamp - lastTimeStamp <= 500) {
+        if (lastTimeStamp != null && currentTimeStamp - lastTimeStamp <= coolDownTime) {
+            long timeLeft = Math.max(1, Duration.of(currentTimeStamp - lastTimeStamp, ChronoUnit.MILLIS).toSeconds());
+            if (coolDownMessage != null) event.player.sendMessage(ChatColor.translateAlternateColorCodes('&', coolDownMessage.replace("%time%", String.valueOf(timeLeft))));
             EVENT_COOLDOWN_MAP.put(uuid, currentTimeStamp);
             event.setCancelled(true);
             return true;
         }
+
 
         Bukkit.getScheduler().scheduleSyncDelayedTask(ArmorPlus.get(), () -> EVENT_COOLDOWN_MAP.put(uuid, currentTimeStamp));
         return false;
