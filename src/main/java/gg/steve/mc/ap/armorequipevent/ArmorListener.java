@@ -19,7 +19,11 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 
+import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * @author Arnah
@@ -28,9 +32,15 @@ import java.util.List;
 public class ArmorListener implements Listener {
 
     private final List<String> blockedMaterials;
+    private final EnumMap<Material, ArmorType> armorTypeByMaterialMap = new EnumMap<>(Material.class);
 
     public ArmorListener(List<String> blockedMaterials) {
         this.blockedMaterials = blockedMaterials;
+        for (Material material : Material.values()) {
+            for (ArmorType armorType : ArmorType.values()) {
+                if (armorType.getPattern().matcher(material.name()).matches()) this.armorTypeByMaterialMap.put(material, armorType);
+            }
+        }
     }
     //Event Priority is highest because other plugins might cancel the events before we check.
 
@@ -38,22 +48,33 @@ public class ArmorListener implements Listener {
     // Ibramsou Start - Fix duplication
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public final void inventoryClick(final InventoryClickEvent e) {
-        if (!(e.getWhoClicked() instanceof Player)) {
+        if (!(e.getWhoClicked() instanceof Player player)) {
             return;
         }
         final ClickType click = e.getClick();
         if (click == ClickType.DROP) return;
-        final Player player = (Player) e.getWhoClicked();
+        if (e.getClickedInventory() == null || e.getClickedInventory().getType() != InventoryType.PLAYER) return;
         final int slot = e.getSlot();
         final InventoryType.SlotType slotType = e.getSlotType();
         if (slotType != InventoryType.SlotType.ARMOR && slotType != InventoryType.SlotType.QUICKBAR && slotType != InventoryType.SlotType.CONTAINER)
             return;
-        final boolean shift = click.equals(ClickType.SHIFT_LEFT) || click.equals(ClickType.SHIFT_RIGHT);
+        final boolean shift = click.isShiftClick();
         final boolean fillEmptyShift = shift && slotType != InventoryType.SlotType.ARMOR;
         final PlayerInventory inventory = player.getInventory();
-        final int shiftSlot = shift ? isAirOrNull(inventory.getHelmet()) ? 39 : isAirOrNull(inventory.getChestplate()) ? 38 :
-                isAirOrNull(inventory.getLeggings()) ? 37 : isAirOrNull(inventory.getBoots()) ? 36 : -1 : -10;
-        if (fillEmptyShift && shiftSlot == -1) return;
+        final ItemStack oldCursor = e.getCursor();
+        final ItemStack oldCurrent = e.getCurrentItem();
+        ArmorType armorType = null;
+        if (fillEmptyShift) {
+            if (isAirOrNull(oldCurrent)) return;
+            ArmorType type = this.armorTypeByMaterialMap.get(oldCurrent.getType());
+            if (isAirOrNull(inventory.getItem(type.getInventorySlot()))) {
+                armorType = type;
+            }
+        } else {
+            armorType = ArmorType.matchTypeBySlot(slot);
+        }
+        if (armorType == null) return;
+        final ArmorType newArmorType = armorType;
         final boolean numberkey = click.equals(ClickType.NUMBER_KEY);
         final InventoryAction action = e.getAction();
         final int hotbarButton = e.getHotbarButton();
@@ -61,10 +82,7 @@ public class ArmorListener implements Listener {
             if (e.getCursor() == null || !ConfigManager.CONFIG.get().getStringList("head-items").contains(e.getInventory().getType().toString().toLowerCase()))
                 return;// Why does this get called if nothing happens??
         }
-        final ArmorType newArmorType = ArmorType.matchTypeBySlot(fillEmptyShift ? shiftSlot : slot);
-        if (newArmorType == null) return;
-        final ItemStack oldCursor = e.getCursor();
-        final ItemStack oldCurrent = e.getCurrentItem();
+
         final ArmorType oldArmorType = ArmorType.matchTypeByItem(oldCursor);
         final ItemStack clickedItem = shift && !fillEmptyShift && e.getCurrentItem() != null ? e.getCurrentItem().clone() : null;
         final int firstEmptySlot;
@@ -90,8 +108,8 @@ public class ArmorListener implements Listener {
             firstEmptySlot = -1;
         }
         Bukkit.getScheduler().scheduleSyncDelayedTask(ArmorPlus.get(), () -> {
-            final Inventory clickedInventory = player.getInventory();
-            ItemStack newArmorPiece = fillEmptyShift ? clickedInventory.getItem(shiftSlot) : clickedInventory.getItem(slot);
+            final PlayerInventory clickedInventory = player.getInventory();
+            ItemStack newArmorPiece = newArmorType.getArmorPiece(clickedInventory);
             ItemStack oldArmorPiece = fillEmptyShift ? null : numberkey ? clickedInventory.getItem(hotbarButton) : shift ? clickedItem : player.getItemOnCursor();
             ArmorEquipEvent.EquipMethod method = ArmorEquipEvent.EquipMethod.PICK_DROP;
             if (action.equals(InventoryAction.HOTBAR_SWAP) || numberkey) {
@@ -109,7 +127,7 @@ public class ArmorListener implements Listener {
                 }
                 if (fillEmptyShift) {
                     clickedInventory.setItem(slot, newArmorPiece);
-                    clickedInventory.setItem(shiftSlot, null);
+                    clickedInventory.setItem(newArmorType.getInventorySlot(), null);
                 } else {
                     clickedInventory.setItem(slot, oldArmorPiece);
                     if (firstEmptySlot != -1) {
@@ -186,16 +204,6 @@ public class ArmorListener implements Listener {
                 event.setCancelled(true);
             }
         }
-        // Debug shit
-		/*System.out.println("Slots: " + event.getInventorySlots().toString());
-		System.out.println("Raw Slots: " + event.getRawSlots().toString());
-		if(event.getCursor() != null){
-			System.out.println("Cursor: " + event.getCursor().getType().name());
-		}
-		if(event.getOldCursor() != null){
-			System.out.println("OldCursor: " + event.getOldCursor().getType().name());
-		}
-		System.out.println("Type: " + event.getType().name());*/
     }
 
     @EventHandler

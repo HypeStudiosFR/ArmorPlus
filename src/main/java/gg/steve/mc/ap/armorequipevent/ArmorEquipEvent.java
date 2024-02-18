@@ -25,6 +25,7 @@ public final class ArmorEquipEvent extends PlayerEvent implements Cancellable {
     public static final Map<UUID, Long> EVENT_COOLDOWN_MAP = new HashMap<>();
 
     public static boolean hasCoolDown(ArmorEquipEvent event) {
+        if (event.getNewArmorPiece() == null || event.getOldArmorPiece() == null) return false;
         if (!ConfigManager.CONFIG.get().getBoolean("click-cooldown.enabled")) {
             return false;
         }
