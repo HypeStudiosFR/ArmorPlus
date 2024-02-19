@@ -6,7 +6,7 @@
 
     <groupId>gg.steve.mc.ap</groupId>
     <artifactId>ArmorPlus</artifactId>
-    <version>v2.3.9</version>
+    <version>v2.3.10</version>
     <packaging>jar</packaging>
 
     <distributionManagement>

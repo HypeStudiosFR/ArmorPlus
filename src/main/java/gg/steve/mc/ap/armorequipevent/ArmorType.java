@@ -7,7 +7,6 @@ import org.bukkit.inventory.PlayerInventory;
 
 import java.util.EnumMap;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
@@ -26,6 +25,18 @@ public enum ArmorType {
     private final Function<PlayerInventory, ItemStack> toArmorItem;
     private final int inventorySlot;
     private final Pattern pattern;
+
+    public static final EnumMap<Material, ArmorType> TYPES_BY_MATERIALS = new EnumMap<>(Material.class);
+
+    static {
+        for (Material material : Material.values()) {
+            for (ArmorType armorType : ArmorType.values()) {
+                if (armorType.getPattern().matcher(material.name()).matches()) {
+                    TYPES_BY_MATERIALS.put(material, armorType);
+                }
+            }
+        }
+    }
 
     ArmorType(int slot, int inventorySlot, Pattern pattern, BiConsumer<PlayerInventory, ItemStack> applyItemConsumer, Function<PlayerInventory, ItemStack> toArmorItem) {
         this.slot = slot;
@@ -58,6 +69,10 @@ public enum ArmorType {
 
     public static ArmorType matchTypeBySlot(int slot) {
         return slot == 39 ? HELMET : slot == 38 ? CHESTPLATE : slot == 37 ? LEGGINGS : slot == 36 ? BOOTS : null;
+    }
+
+    public boolean isInvalid(ItemStack itemStack) {
+        return itemStack != null && TYPES_BY_MATERIALS.get(itemStack.getType()) != this;
     }
 
     public ItemStack getArmorPiece(PlayerInventory inventory) {

@@ -1,9 +1,13 @@
 package gg.steve.mc.ap.armorequipevent;
 
 import gg.steve.mc.ap.ArmorPlus;
+import gg.steve.mc.ap.click.ClickArmorType;
+import gg.steve.mc.ap.click.ClickSlot;
+import gg.steve.mc.ap.click.ClickUtils;
 import gg.steve.mc.ap.managers.ConfigManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
@@ -19,11 +23,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 
-import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Pattern;
+import java.util.*;
 
 /**
  * @author Arnah
@@ -32,126 +32,105 @@ import java.util.regex.Pattern;
 public class ArmorListener implements Listener {
 
     private final List<String> blockedMaterials;
-    private final EnumMap<Material, ArmorType> armorTypeByMaterialMap = new EnumMap<>(Material.class);
+    private final Map<ItemStack, ClickSlot> dropMap = new HashMap<>();
 
     public ArmorListener(List<String> blockedMaterials) {
         this.blockedMaterials = blockedMaterials;
-        for (Material material : Material.values()) {
-            for (ArmorType armorType : ArmorType.values()) {
-                if (armorType.getPattern().matcher(material.name()).matches()) this.armorTypeByMaterialMap.put(material, armorType);
-            }
-        }
+
     }
     //Event Priority is highest because other plugins might cancel the events before we check.
 
 
-    // Ibramsou Start - Fix duplication
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    public final void inventoryClick(final InventoryClickEvent e) {
-        if (!(e.getWhoClicked() instanceof Player player)) {
+
+    // Ibramsou Start - Recode and fix duplication issues
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onClick(InventoryClickEvent event) {
+        if (event.getClickedInventory() == null || !(event.getClickedInventory() instanceof PlayerInventory playerInventory)) return;
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+        final InventoryType.SlotType slotType = event.getSlotType();
+        final ClickType type = event.getClick();
+        final ClickArmorType clickArmorType;
+        final boolean isHotBarKey = type.equals(ClickType.NUMBER_KEY);
+        if (type.isShiftClick()) {
+            clickArmorType = slotType == InventoryType.SlotType.ARMOR ? ClickArmorType.EMPTY_ARMOR_CONTENT : ClickArmorType.FILL_ARMOR_CONTENT;
+        } else {
+            clickArmorType = isHotBarKey ? ClickArmorType.HOT_BAR_KEY : ClickArmorType.CLICK_ARMOR_CONTENT;
+        }
+        final int resultSlot = clickArmorType.getResultSlot(event);
+        final int baseSlot = clickArmorType.getBaseSlot(event);
+        final ArmorType resultArmorType = ClickUtils.fromResultSlot(resultSlot);
+        if (resultArmorType == null) return;
+        final ItemStack resultItem = playerInventory.getItem(resultSlot);
+        final ItemStack oldItemStack = resultItem == null ? null : resultItem.clone();
+
+        final InventoryAction action = event.getAction();
+        final ArmorEquipEvent.EquipMethod method;
+        if (action.equals(InventoryAction.HOTBAR_SWAP) ||  isHotBarKey) {
+            method = ArmorEquipEvent.EquipMethod.HOTBAR_SWAP;
+        } else if (type.isShiftClick()) {
+            method = ArmorEquipEvent.EquipMethod.SHIFT_CLICK;
+        } else {
+            method = ArmorEquipEvent.EquipMethod.PICK_DROP;
+        }
+        final ClickSlot clickSlot = new ClickSlot(player, resultArmorType, oldItemStack, resultSlot, baseSlot, method);
+        if (type == ClickType.DROP || type == ClickType.CONTROL_DROP) {
+            if (oldItemStack == null) return;
+            this.dropMap.put(oldItemStack, clickSlot);
             return;
         }
-        final ClickType click = e.getClick();
-        if (click == ClickType.DROP) return;
-        if (e.getClickedInventory() == null || e.getClickedInventory().getType() != InventoryType.PLAYER) return;
-        final int slot = e.getSlot();
-        final InventoryType.SlotType slotType = e.getSlotType();
-        if (slotType != InventoryType.SlotType.ARMOR && slotType != InventoryType.SlotType.QUICKBAR && slotType != InventoryType.SlotType.CONTAINER)
-            return;
-        final boolean shift = click.isShiftClick();
-        final boolean fillEmptyShift = shift && slotType != InventoryType.SlotType.ARMOR;
-        final PlayerInventory inventory = player.getInventory();
-        final ItemStack oldCursor = e.getCursor();
-        final ItemStack oldCurrent = e.getCurrentItem();
-        ArmorType armorType = null;
-        if (fillEmptyShift) {
-            if (isAirOrNull(oldCurrent)) return;
-            ArmorType type = this.armorTypeByMaterialMap.get(oldCurrent.getType());
-            if (isAirOrNull(inventory.getItem(type.getInventorySlot()))) {
-                armorType = type;
-            }
-        } else {
-            armorType = ArmorType.matchTypeBySlot(slot);
-        }
-        if (armorType == null) return;
-        final ArmorType newArmorType = armorType;
-        final boolean numberkey = click.equals(ClickType.NUMBER_KEY);
-        final InventoryAction action = e.getAction();
-        final int hotbarButton = e.getHotbarButton();
-        if (action == InventoryAction.NOTHING) {
-            if (e.getCursor() == null || !ConfigManager.CONFIG.get().getStringList("head-items").contains(e.getInventory().getType().toString().toLowerCase()))
-                return;// Why does this get called if nothing happens??
-        }
 
-        final ArmorType oldArmorType = ArmorType.matchTypeByItem(oldCursor);
-        final ItemStack clickedItem = shift && !fillEmptyShift && e.getCurrentItem() != null ? e.getCurrentItem().clone() : null;
-        final int firstEmptySlot;
-        if (shift && !fillEmptyShift) {
-            int emptySlot = -1;
-            for (int i = 9; i < 35; i++) {
-                if (isAirOrNull(player.getInventory().getItem(i))) {
-                    emptySlot = i;
-                    break;
-                }
-            }
-            if (emptySlot == -1) {
-                for (int i = 0; i < 8; i++) {
-                    if (isAirOrNull(player.getInventory().getItem(i))) {
-                        emptySlot = i;
-                        break;
-                    }
-                }
-            }
-
-            firstEmptySlot = emptySlot;
-        } else {
-            firstEmptySlot = -1;
-        }
-        Bukkit.getScheduler().scheduleSyncDelayedTask(ArmorPlus.get(), () -> {
-            final PlayerInventory clickedInventory = player.getInventory();
-            ItemStack newArmorPiece = newArmorType.getArmorPiece(clickedInventory);
-            ItemStack oldArmorPiece = fillEmptyShift ? null : numberkey ? clickedInventory.getItem(hotbarButton) : shift ? clickedItem : player.getItemOnCursor();
-            ArmorEquipEvent.EquipMethod method = ArmorEquipEvent.EquipMethod.PICK_DROP;
-            if (action.equals(InventoryAction.HOTBAR_SWAP) || numberkey) {
-                method = ArmorEquipEvent.EquipMethod.HOTBAR_SWAP;
-            } else if (shift) {
-                method = ArmorEquipEvent.EquipMethod.SHIFT_CLICK;
-            }
-            ArmorEquipEvent armorEquipEvent = new ArmorEquipEvent(player, method, newArmorType, oldArmorPiece, newArmorPiece);
-            Bukkit.getServer().getPluginManager().callEvent(armorEquipEvent);
-            if (armorEquipEvent.isCancelled()) {
-                if (oldArmorType != null && oldArmorType != newArmorType && !fillEmptyShift) {
-                    player.setItemOnCursor(oldCursor);
-                    clickedInventory.setItem(slot, oldCurrent);
-                    return;
-                }
-                if (fillEmptyShift) {
-                    clickedInventory.setItem(slot, newArmorPiece);
-                    clickedInventory.setItem(newArmorType.getInventorySlot(), null);
-                } else {
-                    clickedInventory.setItem(slot, oldArmorPiece);
-                    if (firstEmptySlot != -1) {
-                        clickedInventory.setItem(firstEmptySlot, null);
-                    } else if (numberkey) {
-                        clickedInventory.setItem(hotbarButton, newArmorPiece);
-                    } else {
-                        player.setItemOnCursor(newArmorPiece);
-                    }
-                }
-            }
-        });
-
+        Bukkit.getScheduler().scheduleSyncDelayedTask(ArmorPlus.get(), () -> this.compareClickFromLastArmorContents(clickSlot, false));
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.MONITOR)
     public void onDrop(PlayerDropItemEvent event) {
-        final ItemStack oldArmor = event.getItemDrop().getItemStack();
-        final ArmorType type = ArmorType.matchTypeByItem(oldArmor);
-        ArmorEquipEvent armorEquipEvent = new ArmorEquipEvent(event.getPlayer(), ArmorEquipEvent.EquipMethod.PICK_DROP, type, oldArmor, null);
-        Bukkit.getServer().getPluginManager().callEvent(armorEquipEvent);
-        if (armorEquipEvent.isCancelled()) {
-            event.getItemDrop().remove();
-            type.setItemStack(event.getPlayer().getInventory(), oldArmor);
+        final Item item = event.getItemDrop();
+        final ClickSlot clickSlot = this.dropMap.remove(item.getItemStack());
+        if (clickSlot == null) return;
+        final boolean cancelled = event.isCancelled();
+        if (cancelled) {
+            event.setCancelled(false);
+        }
+        if (this.compareClickFromLastArmorContents(clickSlot, cancelled)) {
+            item.remove();
+        }
+    }
+
+    private boolean compareClickFromLastArmorContents(ClickSlot clickSlot, boolean cancelled) {
+        final ArmorType resultArmorType = clickSlot.resultArmorType();
+        final Player player = clickSlot.player();
+        final ItemStack oldItemStack = clickSlot.oldItemStack();
+        final ArmorEquipEvent.EquipMethod method = clickSlot.method();
+        if (resultArmorType == null) return false;
+        final PlayerInventory inventory = player.getInventory();
+        final ItemStack resultItemStack = resultArmorType.getArmorPiece(inventory);
+        if (resultItemStack != null && resultItemStack.equals(oldItemStack)) return false;
+        if (cancelled) {
+            this.cancel(clickSlot, resultItemStack);
+            return true;
+        }
+        final ArmorEquipEvent event = new ArmorEquipEvent(player, method, resultArmorType, oldItemStack, resultItemStack);
+        Bukkit.getPluginManager().callEvent(event);
+        if (event.isCancelled()) {
+            this.cancel(clickSlot, resultItemStack);
+            return true;
+        }
+
+        return false;
+    }
+
+    private void cancel(ClickSlot clickSlot, ItemStack resultItemStack) {
+        final int resultSlot = clickSlot.resultSlot();
+        final int baseSlot = clickSlot.baseSlot();
+        final ItemStack oldItemStack = clickSlot.oldItemStack();
+        final Player player = clickSlot.player();
+        final Inventory inventory = player.getInventory();
+        if (resultSlot == baseSlot) {
+            player.setItemOnCursor(resultItemStack);
+            inventory.setItem(resultSlot, oldItemStack);
+        } else {
+            inventory.setItem(resultSlot, oldItemStack);
+            inventory.setItem(baseSlot, resultItemStack);
         }
     }
     // Ibramsou end
