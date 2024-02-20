@@ -18,7 +18,7 @@ public class ClickUtils {
     public static int getFillingArmorSlot(InventoryClickEvent event) {
         final PlayerInventory inventory = getPlayerInventory(event);
         final ItemStack currentItem = event.getCurrentItem();
-        if (currentItem == null) throw new IllegalStateException("Clicked item should not be null");
+        if (isEmpty(currentItem)) return -1;
         if (isNotEmpty(inventory.getHelmet()) && isNotEmpty(inventory.getChestplate()) && isNotEmpty(inventory.getLeggings()) && isNotEmpty(inventory.getBoots()))
             return -1;
         final ArmorType armorType = ArmorType.TYPES_BY_MATERIALS.get(currentItem.getType());

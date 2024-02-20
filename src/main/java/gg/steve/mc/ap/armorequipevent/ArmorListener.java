@@ -19,6 +19,7 @@ import org.bukkit.event.inventory.*;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemBreakEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
@@ -33,6 +34,7 @@ public class ArmorListener implements Listener {
 
     private final List<String> blockedMaterials;
     private final Map<ItemStack, ClickSlot> dropMap = new HashMap<>();
+    private final Set<UUID> invalidHeadItems = new HashSet<>();
 
     public ArmorListener(List<String> blockedMaterials) {
         this.blockedMaterials = blockedMaterials;
@@ -41,9 +43,19 @@ public class ArmorListener implements Listener {
     //Event Priority is highest because other plugins might cancel the events before we check.
 
 
-
     // Ibramsou Start - Recode and fix duplication issues
-    @EventHandler(priority = EventPriority.HIGHEST)
+    /*@EventHandler
+    public void onJoin(PlayerJoinEvent event) {
+        final Player player = event.getPlayer();
+        final PlayerInventory inventory = player.getInventory();
+        if (ArmorType.HELMET.isInvalid(inventory.getHelmet())) {
+            this.invalidHeadItems.add(player.getUniqueId());
+        }
+    }
+
+     */
+
+    @EventHandler(priority = EventPriority.LOWEST)
     public void onClick(InventoryClickEvent event) {
         if (event.getClickedInventory() == null || !(event.getClickedInventory() instanceof PlayerInventory playerInventory)) return;
         if (!(event.getWhoClicked() instanceof Player player)) return;
@@ -58,10 +70,25 @@ public class ArmorListener implements Listener {
         }
         final int resultSlot = clickArmorType.getResultSlot(event);
         final int baseSlot = clickArmorType.getBaseSlot(event);
+        if (resultSlot == -1 || baseSlot == -1) return;
         final ArmorType resultArmorType = ClickUtils.fromResultSlot(resultSlot);
         if (resultArmorType == null) return;
+
+        /*if (clickArmorType == ClickArmorType.CLICK_ARMOR_CONTENT && resultArmorType == ArmorType.HELMET && resultArmorType.isInvalid(playerInventory.getHelmet())) {
+            boolean alreadyInvalid = this.invalidHeadItems.remove(player.getUniqueId());
+            if (!alreadyInvalid) {
+                final ItemStack currentItem = event.getCurrentItem();
+                final ItemStack cursor = event.getCursor();
+                player.setItemOnCursor(currentItem);
+                playerInventory.setHelmet(cursor);
+                return;
+            }
+        }*/
+
         final ItemStack resultItem = playerInventory.getItem(resultSlot);
         final ItemStack oldItemStack = resultItem == null ? null : resultItem.clone();
+
+
 
         final InventoryAction action = event.getAction();
         final ArmorEquipEvent.EquipMethod method;
@@ -82,7 +109,7 @@ public class ArmorListener implements Listener {
         Bukkit.getScheduler().scheduleSyncDelayedTask(ArmorPlus.get(), () -> this.compareClickFromLastArmorContents(clickSlot, false));
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
+    @EventHandler(priority = EventPriority.LOWEST)
     public void onDrop(PlayerDropItemEvent event) {
         final Item item = event.getItemDrop();
         final ClickSlot clickSlot = this.dropMap.remove(item.getItemStack());
